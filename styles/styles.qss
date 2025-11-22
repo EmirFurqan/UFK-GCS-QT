@@ -1,0 +1,117 @@
+/* === Metric rows (ikonlu satırlar) === */
+#panel {
+  background: #121722;
+  border: 1px solid #1f2432;
+  border-radius: 14px;
+}
+
+#metric {
+  background: #0f1420;
+  border: 1px solid #1f2432;
+  border-radius: 12px;
+}
+
+#metric:hover { background: #11182a; }
+
+#metricIcon {
+  min-width: 28px; min-height: 28px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: #1a2336;
+  color: white;
+}
+
+#metricTitle {
+  color: #9aa6b2;
+  font-size: 12px;
+  letter-spacing: .3px;
+}
+
+#metricValue {
+  color: #e6edf3;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+#metricUnit {
+  color: #9aa6b2;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* === Controls Panel === */
+#controlsPanel {
+  background: rgba(20, 24, 31, 0.7);
+  border: 1px solid #2a3340;
+  border-radius: 10px;
+}
+
+#controlsPanel QPushButton {
+  background: #1b2330;
+  color: #e6edf3;
+  border: 1px solid #2f3a4a;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+#controlsPanel QPushButton:hover {
+  background: #243044;
+}
+
+#controlsPanel QPushButton:pressed {
+  background: #1a2230;
+}
+
+#centerBtn, #regionBtn {
+  qproperty-iconSize: 18px;
+}
+
+/* === Region Dialog === */
+#regionDialog {
+  background: #0f1420;
+}
+
+#regionDialog QLabel#dialogTitle {
+  color: #e6edf3;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+#regionDialog QLabel#dialogSubtitle {
+  color: #9aa6b2;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+#regionDialog QWidget#cornerRow {
+  background: #0e1320;
+  border: 1px solid #1f2432;
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
+#regionDialog QLabel#cornerLabel {
+  color: #9fb0c3;
+  font-weight: 600;
+}
+
+#regionDialog QDoubleSpinBox {
+  min-width: 140px;
+  background: #0c111b;
+  color: #e6edf3;
+  border: 1px solid #1f2432;
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+#regionDialog QPushButton {
+  background: #1b2330;
+  color: #e6edf3;
+  border: 1px solid #2f3a4a;
+  padding: 6px 12px;
+  border-radius: 8px;
+}
+
+#regionDialog QPushButton:hover { background: #243044; }
+#regionDialog QPushButton:pressed { background: #1a2230; }

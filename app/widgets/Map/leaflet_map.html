@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body, #map { height:100%; margin:0; padding:0; }
+    .leaflet-container { background: #0b0f14; }
+    .rot-img { transform-origin: center center; will-change: transform; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map', { zoomControl: true }).setView([39.0, 35.0], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap'
+    }).addTo(map);
+
+    // Cihaz konumunu merkezle (kullanıcı izin verirse)
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          map.setView([lat, lon], 15);
+          L.marker([lat, lon]).addTo(map).bindPopup('Mevcut konumum').openPopup();
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 5000 }
+      );
+    }
+
+    // Marker ve çizgi havuzları
+    window.pyMarkers = {};
+    window.pyLines = {};
+    window.pyRegions = {};
+
+    // Sadece iç <img> döndür (Leaflet'in translate3d'sine dokunma)
+    function setMarkerRotation(marker, headingDeg) {
+      if (!marker || typeof headingDeg !== 'number') return;
+      const iconEl = marker._icon;
+      if (!iconEl) return;
+
+      const img = iconEl.tagName && iconEl.tagName.toLowerCase() === 'img'
+        ? iconEl
+        : iconEl.querySelector('img');
+      if (!img) return;
+
+      img.style.transformOrigin = 'center center';
+      img.style.transform = `rotate(${headingDeg}deg)`;
+    }
+
+    // Jeodezik varış noktası (heading çizgisi için)
+    function destinationPoint(lat, lon, bearingDeg, distanceMeters) {
+      const R = 6371000;
+      const brng = (bearingDeg * Math.PI) / 180.0;
+      const lat1 = (lat * Math.PI) / 180.0;
+      const lon1 = (lon * Math.PI) / 180.0;
+      const angDist = distanceMeters / R;
+
+      const lat2 = Math.asin(
+        Math.sin(lat1) * Math.cos(angDist) +
+        Math.cos(lat1) * Math.sin(angDist) * Math.cos(brng)
+      );
+      const lon2 = lon1 + Math.atan2(
+        Math.sin(brng) * Math.sin(angDist) * Math.cos(lat1),
+        Math.cos(angDist) - Math.sin(lat1) * Math.sin(lat2)
+      );
+      return [(lat2 * 180.0) / Math.PI, (lon2 * 180.0) / Math.PI];
+    }
+
+    // DivIcon ile stabil img (içte kesin <img> var)
+    function ensureIcon(iconUrl, iconSize) {
+      if (!iconUrl) return null;
+      const size = Array.isArray(iconSize) ? iconSize : [40, 40];
+      return L.divIcon({
+        html: `<img src="${iconUrl}" class="rot-img" style="width:${size[0]}px;height:${size[1]}px;"/>`,
+        iconSize: size,
+        iconAnchor: [size[0]/2, size[1]/2],
+        className: "vehicle-divicon"
+      });
+    }
+
+    // id ile marker ekle/güncelle
+    window.addOrUpdateMarker = function(id, lat, lon, options = {}) {
+      if (lat == null || lon == null) return;
+      let m = window.pyMarkers[id];
+      const icon = ensureIcon(options.iconUrl, options.iconSize);
+      if (!m) {
+        m = L.marker([lat, lon], { icon: icon || undefined });
+        m.addTo(map);
+        window.pyMarkers[id] = m;
+      } else {
+        m.setLatLng([lat, lon]);
+        if (icon) m.setIcon(icon);
+      }
+      if (options.popup) m.bindPopup(options.popup);
+      if (typeof options.heading === 'number') setMarkerRotation(m, options.heading);
+    }
+
+    // merkez/zoom ayarla (animasyonlu fly)
+    window.setCenterZoom = function(lat, lon, zoom) {
+      if (lat == null || lon == null) return;
+      const targetZoom = (typeof zoom === 'number') ? zoom : map.getZoom();
+      map.flyTo([lat, lon], targetZoom, { animate: true, duration: 1.3, easeLinearity: 0.2 });
+    }
+
+    // heading çizgisi
+    window.drawHeadingLine = function(id, lat, lon, headingDeg, lengthMeters = 500) {
+      if (lat == null || lon == null || typeof headingDeg !== 'number') return;
+      const end = destinationPoint(lat, lon, headingDeg, lengthMeters);
+      let line = window.pyLines[id];
+      const latlngs = [[lat, lon], [end[0], end[1]]];
+      if (!line) {
+        line = L.polyline(latlngs, { color: 'red', weight: 3, opacity: 0.9 });
+        line.addTo(map);
+        window.pyLines[id] = line;
+      } else {
+        line.setLatLngs(latlngs);
+      }
+    }
+
+    // tüm marker'lara sığdır
+    window.fitToMarkers = function() {
+      const values = Object.values(window.pyMarkers);
+      if (values.length === 0) return;
+      const group = L.featureGroup(values);
+      map.fitBounds(group.getBounds().pad(0.2));
+    }
+
+    // dikdörtgen sınır çiz (minLat,minLon,maxLat,maxLon)
+    window.drawBoundsRect = function(id, minLat, minLon, maxLat, maxLon) {
+      if ([minLat,minLon,maxLat,maxLon].some(v => typeof v !== 'number')) return;
+      const southWest = L.latLng(minLat, minLon);
+      const northEast = L.latLng(maxLat, maxLon);
+      const bounds = L.latLngBounds(southWest, northEast);
+      let rect = window.pyRegions[id];
+      if (!rect) {
+        rect = L.rectangle(bounds, { color: 'blue', weight: 4, fill: false });
+        rect.addTo(map);
+        window.pyRegions[id] = rect;
+      } else {
+        rect.setBounds(bounds);
+      }
+      map.fitBounds(bounds.pad(0.2));
+    }
+
+    window.clearRegion = function(id) {
+      const rect = window.pyRegions[id];
+      if (rect) {
+        try { map.removeLayer(rect); } catch(e){}
+        delete window.pyRegions[id];
+      }
+    }
+
+    // çokgen bölge çiz (latlon çifti dizisi: [[lat,lon],...])
+    window.drawPolygonRegion = function(id, points) {
+      if (!Array.isArray(points) || points.length < 3) return;
+      const latlngs = points.map(p => L.latLng(p[0], p[1]));
+      let poly = window.pyRegions[id];
+      if (!poly) {
+        poly = L.polygon(latlngs, { color: 'blue', weight: 4, fill: false });
+        poly.addTo(map);
+        window.pyRegions[id] = poly;
+      } else {
+        poly.setLatLngs(latlngs);
+        poly.setStyle({ color: 'blue', weight: 4, fill: false });
+      }
+      const bounds = L.latLngBounds(latlngs);
+      map.fitBounds(bounds.pad(0.2));
+    }
+  </script>
+</body>
+</html>
+
+

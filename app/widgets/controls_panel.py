@@ -10,16 +10,23 @@ class ControlsPanel(QWidget):
         lay.setContentsMargins(12, 10, 12, 10)
         lay.setSpacing(8)
 
+        # Ortala
         self.centerBtn = QPushButton("Ortala")
         self.centerBtn.setObjectName("centerBtn")
         self.centerBtn.setFixedHeight(32)
 
+        # Bölge
         self.regionBtn = QPushButton("Bölge")
         self.regionBtn.setObjectName("regionBtn")
         self.regionBtn.setFixedHeight(32)
 
+        # MISSION — YENİ BUTON
+        self.missionBtn = QPushButton("Mission")
+        self.missionBtn.setObjectName("missionBtn")
+        self.missionBtn.setFixedHeight(32)
+
+        # Yerleştir
         lay.addWidget(self.centerBtn)
         lay.addWidget(self.regionBtn)
+        lay.addWidget(self.missionBtn)   # ← BUNU EKLEDİK
         lay.addStretch(1)
-
-

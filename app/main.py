@@ -1,7 +1,7 @@
 import sys, qtawesome as qta, signal, traceback, os
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QLabel, QLineEdit, QPushButton,
-    QVBoxLayout, QHBoxLayout, QGridLayout, QFrame, QSizePolicy
+    QVBoxLayout, QHBoxLayout, QGridLayout, QFrame, QSizePolicy,QMessageBox, QInputDialog
 )
 from PyQt5.QtCore import Qt, QSize, QCoreApplication
 from widgets import MetricRow
@@ -11,7 +11,7 @@ from widgets.controls_panel import ControlsPanel
 from widgets.region_dialog import RegionDialog
 from pathlib import Path
 import json
-from mavlink.mavsdk_worker import MavsdkWorker  # senin mevcut worker
+from mavlink.mavsdk_worker import MavsdkWorker 
 
 def make_card(title: str, prop_name: str = None):
     box = QFrame(); box.setObjectName("card")
@@ -56,7 +56,7 @@ class MainWindow(QMainWindow):
         # Araç ikonu (ufkefsun.png) ayarla
         try:
             self.map.set_vehicle_icon(
-                "/Users/emirfurkangokdemir/Desktop/GCS MAvlink Messages/styles/ufkefsun.png"
+                r"C:\Users\yuste\Desktop\UFK-GCS-QT\styles\ufkefsun.png"
             )
         except Exception:
             pass
@@ -72,6 +72,8 @@ class MainWindow(QMainWindow):
 
         # Bölge butonu: dialog aç, kaydedip çiz
         self.controls.regionBtn.clicked.connect(self.on_region_clicked)
+        # Mission butonu: waypoint / görev ekleme
+        self.controls.missionBtn.clicked.connect(self.on_mission_clicked)
 
         # Açılışta kayıtlı bölgeyi yükle ve çiz (harita hazır olduğunda)
         self._regions_path = Path(__file__).resolve().parent / "config" / "regions.json"
@@ -109,6 +111,21 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
             self._draw_polygon(polygon)
+    def on_mission_clicked(self):
+        """
+        Mission butonu:
+        - Worker'a 'arm + takeoff + misyonu başlat' komutu gönderir
+        """
+        if not hasattr(self, "w") or self.w is None:
+            return
+
+        self.statusLbl.setText("Mission: ARM + TAKEOFF + START...")
+        try:
+            self.w.start_mission() 
+        except Exception as e:
+            # İstersen QMessageBox da kullanırsın
+            print("Mission komutu gönderilemedi:", e)
+
 
     def _load_and_draw_region(self):
         try:

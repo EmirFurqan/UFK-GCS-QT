@@ -2,10 +2,11 @@ import asyncio, math, time
 from PyQt5.QtCore import QThread, pyqtSignal
 from dataclasses import dataclass
 from typing import Optional
+import queue 
 
 SERIAL_DEVICE = "/dev/tty.usbmodem1101"
 BAUD = 57600
-CONNECTION_STRING = ""  # e.g. "udpin:0.0.0.0:14550"
+CONNECTION_STRING = "udp://0.0.0.0:14554"  # e.g. "udpin:0.0.0.0:14550"
 
 @dataclass
 class Telemetry:
@@ -30,9 +31,16 @@ class MavsdkWorker(QThread):
     def __init__(self):
         super().__init__()
         self._stop = False
+        self._cmd_queue = queue.Queue() 
 
     def stop(self):
         self._stop = True
+    def start_mission(self):
+        """
+        MainWindow burayı çağıracak:
+        ARM + TAKEOFF + araçta yüklü misyonu başlat.
+        """
+        self._cmd_queue.put(("start_mission", None))
 
     def run(self):
         loop = asyncio.new_event_loop()
@@ -97,6 +105,35 @@ class MavsdkWorker(QThread):
             async for v in drone.telemetry.velocity_ned():
                 state.iha_hiz = (v.north_m_s**2 + v.east_m_s**2) ** 0.5
                 self.telemetry.emit(state)
+        async def command_task():
+            """
+            Kuyruktan komut al, gerekirse ARM + TAKEOFF + MISSION START yap.
+            """
+            while not self._stop:
+                try:
+                    cmd, payload = self._cmd_queue.get_nowait()
+                except queue.Empty:
+                    await asyncio.sleep(0.1)
+                    continue
+
+                if cmd == "start_mission":
+                    try:
+                        self.status.emit("Mission: ARM...")
+                        await drone.action.arm()
+
+                        self.status.emit("Mission: TAKEOFF...")
+                        await drone.action.takeoff()
+
+                        # basit bekleme; is_in_air kontrolü ile iyileştirilebilir
+                        await asyncio.sleep(5)
+
+                        self.status.emit("Mission: START...")
+                        await drone.mission.start_mission()
+
+                        self.status.emit("Mission: running")
+                    except Exception as e:
+                        self.error.emit(f"Mission hata: {e}")
+
 
         # 🔋 Tek döngüde iki bataryayı birlikte işle
         import math, time
@@ -127,4 +164,5 @@ class MavsdkWorker(QThread):
             gps_task(),
             speed_task(),
             battery_task(),
+            command_task(),
         )

@@ -12,6 +12,11 @@ from widgets.region_dialog import RegionDialog
 from pathlib import Path
 import json
 from mavlink.mavsdk_worker import MavsdkWorker 
+import dotenv
+
+dotenv.load_dotenv()
+
+IMAGE_PATH = os.getenv("IMAGE_PATH", "styles/ufkefsun.png")
 
 def make_card(title: str, prop_name: str = None):
     box = QFrame(); box.setObjectName("card")
@@ -27,7 +32,7 @@ def make_card(title: str, prop_name: str = None):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("UAV Telemetry — Modern")
+        self.setWindowTitle("UFK-GCS")
         self.resize(1100, 680)
 
         root = QWidget(); self.setCentralWidget(root)

@@ -13,6 +13,7 @@ from pathlib import Path
 import json
 from mavlink.mavsdk_worker import MavsdkWorker 
 import dotenv
+from widgets.camera import VideoWidget 
 
 dotenv.load_dotenv()
 
@@ -57,22 +58,29 @@ class MainWindow(QMainWindow):
         # ===== Map =====
         self.map = MapWidget(parent=center)
 
-        
+        # ===== Video (kamera) =====
+        self.video = VideoWidget(parent=center, port=5000)  # portu pipeline ile aynı tut
+
         # ===== Kontrol paneli (butonlar) =====
         self.controls = ControlsPanel(parent=center)
-        # Araç ikonu (ufkefsun.png) ayarla
-        try:
-            self.map.set_vehicle_icon(
-                IMAGE_PATH
-            )
-        except Exception:
-            pass
+        ...
+
+        # Harita + kamera için alt bölge
+        bottom = QWidget(center)
+        bottom_layout = QHBoxLayout(bottom)
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
+        bottom_layout.setSpacing(8)
+
+        # solda küçük harita, ortada büyük kamera
+        bottom_layout.addWidget(self.map, 1)    # 1 birim genişlik
+        bottom_layout.addWidget(self.video, 2)  # 2 birim genişlik (daha büyük)
 
         # Assemble
         center_layout.addWidget(header)
         center_layout.addWidget(self.panel, 0)
         center_layout.addWidget(self.controls, 0)
-        center_layout.addWidget(self.map, 1)
+        center_layout.addWidget(bottom, 1)
+
 
         # Ortala butonu: son bilinen araca odaklan
         self.controls.centerBtn.clicked.connect(lambda: self.map.center_on_last(15))
@@ -93,6 +101,7 @@ class MainWindow(QMainWindow):
         self.w.error.connect(self.statusLbl.setText)
         self.w.telemetry.connect(self.on_telemetry)
         self.w.start()
+        self.video.start()
 
     def on_telemetry(self, t):
         if not self.isVisible():
@@ -253,6 +262,13 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
             self.w.stop(); self.w.wait(1500)
+
+        if hasattr(self, "video") and self.video:
+            try:
+                self.video.stop()
+            except Exception:
+                pass
+
         super().closeEvent(e)
 
 if __name__ == "__main__":

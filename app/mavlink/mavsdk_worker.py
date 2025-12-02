@@ -6,7 +6,7 @@ import queue
 
 SERIAL_DEVICE = "/dev/tty.usbmodem1101"
 BAUD = 57600
-CONNECTION_STRING = "udp://0.0.0.0:14553"  # e.g. "udpin:0.0.0.0:14550"
+CONNECTION_STRING = "udp://0.0.0.0:14554"  # e.g. "udpin:0.0.0.0:14550"
 
 @dataclass
 class Telemetry:

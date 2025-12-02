@@ -152,7 +152,6 @@ class MapWidget(QFrame):
         lon_js = "null" if lon is None else str(lon)
 
         icon_url = self._local_file_to_data_url(icon_path) if icon_path else None
-        print("Marker icon URL:", icon_url)
         icon_part = f"'{icon_url}'" if icon_url else "null"
 
         # JS string güvenli popup

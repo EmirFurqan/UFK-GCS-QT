@@ -6,7 +6,7 @@ import queue
 
 SERIAL_DEVICE = "/dev/tty.usbmodem1101"
 BAUD = 57600
-CONNECTION_STRING = "udp://0.0.0.0:14554"  # e.g. "udpin:0.0.0.0:14550"
+CONNECTION_STRING = "udp://0.0.0.0:14553"  # e.g. "udpin:0.0.0.0:14550"
 
 @dataclass
 class Telemetry:
@@ -120,12 +120,6 @@ class MavsdkWorker(QThread):
                     try:
                         self.status.emit("Mission: ARM...")
                         await drone.action.arm()
-
-                        self.status.emit("Mission: TAKEOFF...")
-                        await drone.action.takeoff()
-
-                        # basit bekleme; is_in_air kontrolü ile iyileştirilebilir
-                        await asyncio.sleep(5)
 
                         self.status.emit("Mission: START...")
                         await drone.mission.start_mission()

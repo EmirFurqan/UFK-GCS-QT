@@ -25,8 +25,14 @@ class ControlsPanel(QWidget):
         self.missionBtn.setObjectName("missionBtn")
         self.missionBtn.setFixedHeight(32)
 
+        # QR Noktası
+        self.qrBtn = QPushButton("QR Noktası")
+        self.qrBtn.setObjectName("qrBtn")
+        self.qrBtn.setFixedHeight(32)
+
         # Yerleştir
         lay.addWidget(self.centerBtn)
         lay.addWidget(self.regionBtn)
-        lay.addWidget(self.missionBtn)   # ← BUNU EKLEDİK
+        lay.addWidget(self.missionBtn)
+        lay.addWidget(self.qrBtn)
         lay.addStretch(1)

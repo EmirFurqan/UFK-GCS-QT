@@ -67,25 +67,31 @@ class MapWidget(QFrame):
         if vehicle_icon_path:
             self.set_vehicle_icon(vehicle_icon_path)
 
-    def set_vehicle_icon(self, local_icon_path: str):
-        """Yerel dosyayı data URL'e çevir (CORS sorunsuz)."""
-        if not local_icon_path:
-            self._vehicle_icon_url = None
-            return
+    def _local_file_to_data_url(self, local_path: str):
+        """
+        Yerel bir dosya yolunu mümkünse data: URL'e çevirir.
+        CORS / origin sorunlarını azaltmak için ikonlarda kullanılabilir.
+        """
+        if not local_path:
+            return None
         try:
-            with open(local_icon_path, "rb") as f:
+            with open(local_path, "rb") as f:
                 data = f.read()
-            mime, _ = mimetypes.guess_type(local_icon_path)
+            mime, _ = mimetypes.guess_type(local_path)
             if not mime:
                 mime = "image/png"
             b64 = base64.b64encode(data).decode("ascii")
-            self._vehicle_icon_url = f"data:{mime};base64,{b64}"
+            return f"data:{mime};base64,{b64}"
         except Exception:
-            # Son çare: file:// ile dene
+            # Son çare: file:// URL döndür
             try:
-                self._vehicle_icon_url = QUrl.fromLocalFile(local_icon_path).toString()
+                return QUrl.fromLocalFile(local_path).toString()
             except Exception:
-                self._vehicle_icon_url = None
+                return None
+
+    def set_vehicle_icon(self, local_icon_path: str):
+        """Araç ikonu için yerel dosyayı data URL'e çevir (CORS sorunsuz)."""
+        self._vehicle_icon_url = self._local_file_to_data_url(local_icon_path)
 
     def set_center(self, lat: float, lon: float, zoom: int = None):
         lat_js = "null" if lat is None else str(lat)
@@ -145,7 +151,8 @@ class MapWidget(QFrame):
         lat_js = "null" if lat is None else str(lat)
         lon_js = "null" if lon is None else str(lon)
 
-        icon_url = QUrl.fromLocalFile(icon_path).toString() if icon_path else None
+        icon_url = self._local_file_to_data_url(icon_path) if icon_path else None
+        print("Marker icon URL:", icon_url)
         icon_part = f"'{icon_url}'" if icon_url else "null"
 
         # JS string güvenli popup

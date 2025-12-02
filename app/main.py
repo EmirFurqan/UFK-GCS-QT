@@ -17,6 +17,7 @@ import dotenv
 dotenv.load_dotenv()
 
 IMAGE_PATH = os.getenv("IMAGE_PATH", "styles/ufkefsun.png")
+QR_ICON_PATH = os.getenv("QR_ICON_PATH", "styles/qr.png")
 
 def make_card(title: str, prop_name: str = None):
     box = QFrame(); box.setObjectName("card")
@@ -56,12 +57,13 @@ class MainWindow(QMainWindow):
         # ===== Map =====
         self.map = MapWidget(parent=center)
 
+        
         # ===== Kontrol paneli (butonlar) =====
         self.controls = ControlsPanel(parent=center)
         # Araç ikonu (ufkefsun.png) ayarla
         try:
             self.map.set_vehicle_icon(
-                r"C:\Users\yuste\Desktop\UFK-GCS-QT\styles\ufkefsun.png"
+                IMAGE_PATH
             )
         except Exception:
             pass
@@ -74,11 +76,12 @@ class MainWindow(QMainWindow):
 
         # Ortala butonu: son bilinen araca odaklan
         self.controls.centerBtn.clicked.connect(lambda: self.map.center_on_last(15))
-
         # Bölge butonu: dialog aç, kaydedip çiz
         self.controls.regionBtn.clicked.connect(self.on_region_clicked)
         # Mission butonu: waypoint / görev ekleme
         self.controls.missionBtn.clicked.connect(self.on_mission_clicked)
+         # QR noktası butonu: lat,lon al, arı marker çiz ve kaydet
+        self.controls.qrBtn.clicked.connect(self.on_qr_clicked)
 
         # Açılışta kayıtlı bölgeyi yükle ve çiz (harita hazır olduğunda)
         self._regions_path = Path(__file__).resolve().parent / "config" / "regions.json"
@@ -116,6 +119,59 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
             self._draw_polygon(polygon)
+
+    def on_qr_clicked(self):
+        """
+        QR koordinatı gir:
+        - Kullanıcıdan "lat,lon" formatında al
+        - JSON'a qr_point olarak kaydet
+        - Haritaya arı ikonlu marker çiz
+        """
+        text, ok = QInputDialog.getText(
+            self,
+            "QR Koordinatı",
+            "Enlem, boylam gir (örnek: 41.0, 29.0):"
+        )
+        if not ok or not text.strip():
+            return
+
+        # "41.0, 29.0" / "41.0 29.0" gibi formatları destekle
+        raw = text.replace(";", ",").replace(" ", ",")
+        parts = [p.strip() for p in raw.split(",") if p.strip()]
+
+        if len(parts) != 2:
+            QMessageBox.warning(self, "Hata", "Lütfen 'enlem, boylam' formatında gir.")
+            return
+
+        try:
+            lat = float(parts[0])
+            lon = float(parts[1])
+        except ValueError:
+            QMessageBox.warning(self, "Hata", "Enlem ve boylam sayısal olmalı.")
+            return
+
+        # Haritada göster
+        self._set_qr_point(lat, lon)
+
+        # JSON'a kaydet: varsa polygon/region'u koru, sadece qr_point ekle/güncelle
+        data = {}
+        try:
+            if self._regions_path.exists():
+                data = json.loads(self._regions_path.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+
+        data["qr_point"] = {"lat": lat, "lon": lon}
+
+        try:
+            self._regions_path.parent.mkdir(parents=True, exist_ok=True)
+            self._regions_path.write_text(
+                json.dumps(data, ensure_ascii=False, indent=2),
+                encoding="utf-8"
+            )
+        except Exception as e:
+            QMessageBox.warning(self, "Hata", f"QR noktası kaydedilemedi:\n{e}")
+
     def on_mission_clicked(self):
         """
         Mission butonu:
@@ -136,13 +192,26 @@ class MainWindow(QMainWindow):
         try:
             if self._regions_path.exists():
                 data = json.loads(self._regions_path.read_text(encoding="utf-8"))
+
+                # Yeni format: polygon
                 if data.get("polygon"):
                     self._draw_polygon(data.get("polygon"))
+                # Eski format: min/max lat lon
                 elif data.get("region"):
-                    # eski format desteği
                     self._draw_region(data.get("region"))
+
+                # QR noktası varsa onu da çiz
+                qr = data.get("qr_point")
+                if qr and "lat" in qr and "lon" in qr:
+                    try:
+                        lat = float(qr["lat"])
+                        lon = float(qr["lon"])
+                        self._set_qr_point(lat, lon)
+                    except Exception:
+                        pass
         except Exception:
             pass
+
 
     def _draw_region(self, region):
         try:
@@ -160,6 +229,22 @@ class MainWindow(QMainWindow):
         except Exception:
             return
         self.map.draw_polygon(pts)
+
+    def _set_qr_point(self, lat: float, lon: float):
+        """
+        Haritada arı ikonlu QR marker'ı çiz ve hafifçe ortala.
+        """
+        try:
+            self.map.add_marker(
+                marker_id="qr_point",
+                lat=lat,
+                lon=lon,
+                icon_path=QR_ICON_PATH,
+                icon_size=(36, 36)
+            )
+        except Exception as e:
+            print("QR marker çizilemedi:", e)
+
 
     def closeEvent(self, e):
         if hasattr(self, "w") and self.w:

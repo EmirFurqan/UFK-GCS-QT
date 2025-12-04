@@ -14,6 +14,8 @@ import json
 from mavlink.mavsdk_worker import MavsdkWorker 
 import dotenv
 from widgets.camera import VideoWidget 
+from widgets.hud_widget import HorizonHUD
+
 
 dotenv.load_dotenv()
 
@@ -30,57 +32,90 @@ def make_card(title: str, prop_name: str = None):
     value_lbl = QLabel("—");  value_lbl.setObjectName("cardValue")
     lay.addWidget(title_lbl); lay.addWidget(value_lbl)
     return box, value_lbl
-
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("UFK-GCS")
         self.resize(1100, 680)
 
-        root = QWidget(); self.setCentralWidget(root)
-        root_layout = QHBoxLayout(root); root_layout.setContentsMargins(0,0,0,0); root_layout.setSpacing(0)
-       
+        root = QWidget()
+        self.setCentralWidget(root)
+        root_layout = QHBoxLayout(root)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
+
         # ===== Main Area =====
         center = QWidget()
-        center_layout = QVBoxLayout(center); center_layout.setContentsMargins(16,16,16,16); center_layout.setSpacing(14)
+        center_layout = QVBoxLayout(center)
+        center_layout.setContentsMargins(16, 16, 16, 16)
+        center_layout.setSpacing(14)
         root_layout.addWidget(center, 1)
 
-        # Sadece telemetri başlığı ve durum etiketi
-        header = QFrame(); header.setObjectName("header")
-        hl = QHBoxLayout(header); hl.setContentsMargins(12,10,12,10); hl.setSpacing(10)
-        title = QLabel("Telemetry"); title.setObjectName("title")
-        self.statusLbl = QLabel("Bağlantı bekleniyor…"); self.statusLbl.setObjectName("statusLbl")
-        hl.addWidget(title); hl.addStretch(1); hl.addWidget(self.statusLbl)
+        # ----- HEADER -----
+        header = QFrame()
+        header.setObjectName("header")
+        hl = QHBoxLayout(header)
+        hl.setContentsMargins(12, 10, 12, 10)
+        hl.setSpacing(10)
 
-        # ===== Telemetry panel =====
+        title = QLabel("Telemetry")
+        title.setObjectName("title")
+        self.statusLbl = QLabel("Bağlantı bekleniyor…")
+        self.statusLbl.setObjectName("statusLbl")
+
+        hl.addWidget(title)
+        hl.addStretch(1)
+        hl.addWidget(self.statusLbl)
+
+        # ===== Telemetry panel (üstteki kartlar) =====
         self.panel = TelemetryPanel(parent=center)
 
         # ===== Map =====
         self.map = MapWidget(parent=center)
 
         # ===== Video (kamera) =====
-        self.video = VideoWidget(parent=center, port=5000)  # portu pipeline ile aynı tut
+        self.video = VideoWidget(parent=center, port=5000)
+
+        # ===== HUD (orta sütunun altı) =====
+        self.hud = HorizonHUD(parent=center)
+
 
         # ===== Kontrol paneli (butonlar) =====
         self.controls = ControlsPanel(parent=center)
-        ...
 
-        # Harita + kamera için alt bölge
+        # ===== ALT BÖLGE: MAP | (CAMERA+HUD) | EMPTY =====
         bottom = QWidget(center)
         bottom_layout = QHBoxLayout(bottom)
         bottom_layout.setContentsMargins(0, 0, 0, 0)
         bottom_layout.setSpacing(8)
 
-        # solda küçük harita, ortada büyük kamera
-        bottom_layout.addWidget(self.map, 1)    # 1 birim genişlik
-        bottom_layout.addWidget(self.video, 2)  # 2 birim genişlik (daha büyük)
+        # 1) SOL SÜTUN → MAP
+        bottom_layout.addWidget(self.map, 1)
 
-        # Assemble
-        center_layout.addWidget(header)
+        # 2) ORTA SÜTUN → ÜST CAMERA, ALT HUD
+        middle = QWidget(bottom)
+        middle_layout = QVBoxLayout(middle)
+        middle_layout.setContentsMargins(0, 0, 0, 0)
+        middle_layout.setSpacing(8)
+
+        # ÜST: CAMERA
+        middle_layout.addWidget(self.video, 1)
+
+        # ALT: HUD
+        middle_layout.addWidget(self.hud, 1)
+
+        bottom_layout.addWidget(middle, 1)
+
+        # 3) SAĞ SÜTUN → BOŞ PANEL
+        right_empty = QWidget(bottom)
+        right_empty.setObjectName("emptyRightPanel")
+        bottom_layout.addWidget(right_empty, 1)
+
+        # ----- ÜSTTEN ALTA DİZ -----
+        center_layout.addWidget(header, 0)
         center_layout.addWidget(self.panel, 0)
         center_layout.addWidget(self.controls, 0)
         center_layout.addWidget(bottom, 1)
-
 
         # Ortala butonu: son bilinen araca odaklan
         self.controls.centerBtn.clicked.connect(lambda: self.map.center_on_last(15))
@@ -88,10 +123,12 @@ class MainWindow(QMainWindow):
         self.controls.regionBtn.clicked.connect(self.on_region_clicked)
         # Mission butonu: waypoint / görev ekleme
         self.controls.missionBtn.clicked.connect(self.on_mission_clicked)
-         # QR noktası butonu: lat,lon al, arı marker çiz ve kaydet
+        # QR noktası butonu: lat,lon al, arı marker çiz ve kaydet
         self.controls.qrBtn.clicked.connect(self.on_qr_clicked)
 
         # Açılışta kayıtlı bölgeyi yükle ve çiz (harita hazır olduğunda)
+        self._regions_path = Path(__file__).resolve().parent / "config" / "regions" / "regions.json"
+        # senin path'in farklıysa eski halini kullan:
         self._regions_path = Path(__file__).resolve().parent / "config" / "regions.json"
         self.map.on_ready(lambda: self._load_and_draw_region())
 
@@ -101,14 +138,17 @@ class MainWindow(QMainWindow):
         self.w.error.connect(self.statusLbl.setText)
         self.w.telemetry.connect(self.on_telemetry)
         self.w.start()
-        self.video.start()
 
+        # Kamera
+        self.video.start()
     def on_telemetry(self, t):
         if not self.isVisible():
             return
-        # panel üzerinden güncelle
+
+        # Üstteki kartları güncelle
         self.panel.update_telemetry(t)
-        # harita üzerinden güncelle
+
+        # Harita güncelle
         try:
             lat = getattr(t, "iha_enlem", None)
             lon = getattr(t, "iha_boylam", None)
@@ -117,6 +157,44 @@ class MainWindow(QMainWindow):
                 self.map.update_vehicle(lat, lon, hdg)
         except Exception:
             pass
+
+        # ---------- HUD GÜNCELLE ----------
+        try:
+            roll = getattr(t, "iha_yatis", 0.0) or 0.0
+            pitch = getattr(t, "iha_dikilme", 0.0) or 0.0
+            yaw = getattr(t, "iha_yonelme", 0.0) or 0.0
+            alt = getattr(t, "iha_irtifa", 0.0) or 0.0
+            spd = getattr(t, "iha_hiz", 0.0) or 0.0
+            sats = getattr(t, "baglanilan_gps_sayisi", 0) or 0
+
+            batt0 = getattr(t, "iha_batarya0", None)
+            batt1 = getattr(t, "iha_batarya1", None)
+
+            volts = 0.0
+            if batt0 is not None:
+                volts = float(batt0)
+            elif batt1 is not None:
+                volts = float(batt1)
+
+            if volts > 0:
+                percent = (volts - 21.0) / (25.2 - 21.0) * 100.0
+                percent = max(0.0, min(100.0, percent))
+            else:
+                percent = 0.0
+
+            self.hud.update_hud(
+                float(roll),
+                float(pitch),
+                float(yaw),
+                float(alt),
+                float(spd),
+                float(percent),
+                float(volts),
+                int(sats),
+            )
+        except Exception as e:
+            print("HUD update error:", e)
+
 
     def on_region_clicked(self):
         dlg = RegionDialog(self)

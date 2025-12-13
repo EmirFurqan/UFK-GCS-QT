@@ -1,34 +1,61 @@
 # widgets/video_widget.py
 import cv2
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread
 from PyQt5.QtGui import QImage, QPixmap
-
+import threading
 
 class VideoWidget(QWidget):
+    connection_result = pyqtSignal(bool, object) # success, cap_object
+
     def __init__(self, parent=None, port=5000):
         super().__init__(parent)
         self.setObjectName("videoWidget")
         self._port = port
         self._cap = None
+        self._is_connecting = False
 
+        self.connection_result.connect(self._on_connection_result)
+
+        # Ana layout
+        self._layout = QVBoxLayout(self)
+        self._layout.setContentsMargins(0, 0, 0, 0)
+
+        # 1) Video Label
         self._label = QLabel(self)
         self._label.setAlignment(Qt.AlignCenter)
         self._label.setMinimumSize(320, 240)
         self._label.setStyleSheet("background-color: black;")
+        self._layout.addWidget(self._label)
 
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.addWidget(self._label)
+        # 2) Error / Retry Widget (başlangıçta gizli)
+        self._error_widget = QWidget(self)
+        self._error_widget.setObjectName("videoErrorWidget")
+        self._error_widget.hide()
+        
+        err_lay = QVBoxLayout(self._error_widget)
+        err_lay.setAlignment(Qt.AlignCenter)
+        err_lay.setSpacing(10)
+
+        self._alert_lbl = QLabel("Kamera bağlantısı yok")
+        self._alert_lbl.setObjectName("videoErrorLabel")
+        self._alert_lbl.setAlignment(Qt.AlignCenter)
+
+        self._retry_btn = QPushButton("Tekrar Dene")
+        self._retry_btn.setObjectName("retryVideoBtn")
+        self._retry_btn.setCursor(Qt.PointingHandCursor)
+        self._retry_btn.clicked.connect(self.start)
+
+        err_lay.addWidget(self._alert_lbl)
+        err_lay.addWidget(self._retry_btn)
+
+        self._layout.addWidget(self._error_widget)
 
         self._timer = QTimer(self)
         self._timer.setInterval(33)
         self._timer.timeout.connect(self._update_frame)
 
-        # ÖNEMLİ: init'te capture açma yok.
-        # self._open_capture()  <-- BUNU SİLDİK
-
-    def _open_capture(self):
+    def _open_capture_threaded(self):
         # GStreamer: appsink'e bloklamayı azaltan ayarlar ekledik
         gst_pipeline = (
             f'udpsrc port={self._port} '
@@ -42,27 +69,49 @@ class VideoWidget(QWidget):
         cap = cv2.VideoCapture(gst_pipeline, cv2.CAP_GSTREAMER)
         if cap is not None and cap.isOpened():
             print("[VideoWidget] GStreamer pipeline ile açıldı.")
-            self._cap = cap
-            return True
-
-        print("[VideoWidget] Uyarı: VideoCapture açılamadı.")
-        self._cap = None
-        return False
+            self.connection_result.emit(True, cap)
+        else:
+            print("[VideoWidget] Uyarı: VideoCapture açılamadı.")
+            self.connection_result.emit(False, None)
 
     def start(self):
-        # Event loop başladıktan sonra capture aç
-        def _start_impl():
-            if self._cap is None:
-                ok = self._open_capture()
-                if not ok:
-                    return
-            self._timer.start()
+        if self._is_connecting:
+            return
 
-        QTimer.singleShot(0, _start_impl)
+        # UI hazırlık
+        self._error_widget.hide()
+        self._label.show()
+        # Kullanıcıya bir şey olduğunu hissettirmek için label'a text yazabiliriz ama 
+        # siyah ekran siyah kalacaksa sorun yok.
+        self._label.setText("Bağlanıyor...")
+        self._label.setStyleSheet("background-color: black; color: white;")
+        
+        self._is_connecting = True
+        self._retry_btn.setEnabled(False) 
+        
+        # Thread başlat
+        t = threading.Thread(target=self._open_capture_threaded, daemon=True)
+        t.start()
+
+    def _on_connection_result(self, success, cap):
+        self._is_connecting = False
+        self._retry_btn.setEnabled(True)
+
+        if success:
+            self._cap = cap
+            self._label.setText("") # Texti temizle
+            self._timer.start()
+        else:
+            self._cap = None
+            self._label.hide()
+            self._error_widget.show()
+            self._alert_lbl.setText("Kamera bağlantısı başarısız")
 
     def stop(self):
         self._timer.stop()
         if self._cap is not None:
+             # Release işlemi de bloklayabilir, thread'e almak iyi olur ama
+             # kapanışta çok dert olmayabilir. Yine de try-except ekliyoruz.
             try:
                 self._cap.release()
             except Exception:

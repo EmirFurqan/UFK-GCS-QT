@@ -115,3 +115,30 @@
 
 #regionDialog QPushButton:hover { background: #243044; }
 #regionDialog QPushButton:pressed { background: #1a2230; }
+
+/* === Video Error Widget === */
+#videoErrorWidget {
+  background-color: #0f1420;
+}
+
+#videoErrorLabel {
+  color: #9aa6b2;
+  font-size: 14px;
+}
+
+#retryVideoBtn {
+  background: #1b2330;
+  color: #e6edf3;
+  border: 1px solid #2f3a4a;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+#retryVideoBtn:hover {
+  background: #243044;
+}
+
+#retryVideoBtn:pressed {
+  background: #1a2230;
+}

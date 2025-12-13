@@ -145,9 +145,10 @@ class MainWindow(QMainWindow):
         self.w.error.connect(self.statusLbl.setText)
         self.w.telemetry.connect(self.on_telemetry)
         self.w.start()
-
+        print("Worker started")
         # Kamera
         self.video.start()
+            
     def on_telemetry(self, t):
         if not self.isVisible():
             return

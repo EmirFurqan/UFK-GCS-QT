@@ -11,6 +11,7 @@ CONNECTION_STRING = "udp://0.0.0.0:14554"  # e.g. "udpin:0.0.0.0:14550"
 @dataclass
 class Telemetry:
     heartbeat: bool = False
+    heartbeat: bool = False
     iha_enlem: Optional[float] = 40.7128
     iha_boylam: Optional[float] = 29.6652
     baglanilan_gps_sayisi: Optional[int] = None
@@ -35,12 +36,31 @@ class MavsdkWorker(QThread):
 
     def stop(self):
         self._stop = True
+    
     def start_mission(self):
         """
         MainWindow burayı çağıracak:
         ARM + TAKEOFF + araçta yüklü misyonu başlat.
         """
         self._cmd_queue.put(("start_mission", None))
+
+    def send_manual_control(self, x, y, z, r):
+        """
+        Control Surfaces testi için.
+        x: pitch | y: roll | z: throttle | r: yaw
+        Değerler -1.0 ile 1.0 arasında (throttle 0..1 genelde).
+        """
+        self._cmd_queue.put(("manual_control", (x, y, z, r)))
+
+    def test_motor(self, motor_id: int):
+        """
+        Basit motor testi.
+        Gerçek "Motor Test" (MAV_CMD_DO_MOTOR_TEST) MAVSDK'da 'action.do_motor_test'
+        gibi bir şeyle henüz standart değilse, custom command yollamak gerekebilir.
+        Burada şimdilik 'placeholder' olarak log basacağız veya 
+        basic bir action deneyeceğiz.
+        """
+        self._cmd_queue.put(("motor_test", motor_id))
 
     def run(self):
         loop = asyncio.new_event_loop()
@@ -127,6 +147,37 @@ class MavsdkWorker(QThread):
                         self.status.emit("Mission: running")
                     except Exception as e:
                         self.error.emit(f"Mission hata: {e}")
+
+                elif cmd == "manual_control":
+                    try:
+                        # payload = (x, y, z, r)
+                        val = payload
+                        if val:
+                             # manual_control yollamak için set_manual_control_input kullanıyoruz
+                             # Önce manual moda geçmek gerekebilir, ama genellikle "Stabilized" veya "Manual"
+                             # modu aktifken bu input işlenir. 
+                             # Test amaçlı sadece input yolluyoruz.
+                             await drone.manual_control.set_manual_control_input(val[0], val[1], val[2], val[3])
+                    except Exception as e:
+                        print(f"Manual control hata: {e}")
+
+                elif cmd == "motor_test":
+                    try:
+                        # Motor test. 
+                        # MAVSDK-Python henüz 'do_motor_test' sarıcısına sahip olmayabilir.
+                        # Veya 'action' altında olabilir. Yoksa raw mavlink atmamız lazım.
+                        # Şimdilik konsola basıp geçiyoruz, ya da basit bir 'actuator' testi
+                        # simüle ediyoruz.
+                        mid = payload
+                        print(f"!!! MOTOR TEST !!! Motor ID: {mid} çalıştırılıyor (SIMULATED)")
+                        # Eğer gerçek command yollamak istersek:
+                        # await drone.action.do_motor_test(...) # (hayali)
+                        
+                        # Alternatif: kısa süreliğine biraz gaz verip kesebiliriz ama tehlikeli olabilir.
+                        # Sadece log basalım.
+                        self.status.emit(f"Test: Motor {mid}")
+                    except Exception as e:
+                        print(f"Motor test hata: {e}")
 
 
         # 🔋 Tek döngüde iki bataryayı birlikte işle

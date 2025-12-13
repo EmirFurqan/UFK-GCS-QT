@@ -15,6 +15,7 @@ from mavlink.mavsdk_worker import MavsdkWorker
 import dotenv
 from widgets.camera import VideoWidget 
 from widgets.hud_widget import HorizonHUD
+from widgets.precheck_modal import PreCheckDialog
 
 
 dotenv.load_dotenv()
@@ -132,6 +133,8 @@ class MainWindow(QMainWindow):
         self.controls.missionBtn.clicked.connect(self.on_mission_clicked)
         # QR noktası butonu: lat,lon al, arı marker çiz ve kaydet
         self.controls.qrBtn.clicked.connect(self.on_qr_clicked)
+        # Ön kontrol
+        self.controls.preCheckBtn.clicked.connect(self.on_precheck_clicked)
 
         # Açılışta kayıtlı bölgeyi yükle ve çiz (harita hazır olduğunda)
         self._regions_path = Path(__file__).resolve().parent / "config" / "regions" / "regions.json"
@@ -203,6 +206,16 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print("HUD update error:", e)
 
+
+
+    def on_precheck_clicked(self):
+        """
+        Uçuş öncesi kontrol modalını aç.
+        """
+        if not hasattr(self, "w"):
+            return
+        dlg = PreCheckDialog(self, worker=self.w)
+        dlg.exec_()
 
     def on_region_clicked(self):
         dlg = RegionDialog(self)

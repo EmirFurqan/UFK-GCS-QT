@@ -20,19 +20,26 @@ class ControlsPanel(QWidget):
         self.regionBtn.setObjectName("regionBtn")
         self.regionBtn.setFixedHeight(32)
 
-        # MISSION — YENİ BUTON
+        # MISSION
         self.missionBtn = QPushButton("Mission")
         self.missionBtn.setObjectName("missionBtn")
         self.missionBtn.setFixedHeight(32)
 
         # QR Noktası
-        self.qrBtn = QPushButton("QR Noktası")
+        self.qrBtn = QPushButton("QR")
         self.qrBtn.setObjectName("qrBtn")
         self.qrBtn.setFixedHeight(32)
+
+        # ÖN KONTROL (Pre-Check)
+        self.preCheckBtn = QPushButton("Ön Kontrol")
+        self.preCheckBtn.setObjectName("preCheckBtn")
+        self.preCheckBtn.setFixedHeight(32)
+        # Stil olarak biraz farklı yapabiliriz (opsiyonel)
 
         # Yerleştir
         lay.addWidget(self.centerBtn)
         lay.addWidget(self.regionBtn)
         lay.addWidget(self.missionBtn)
         lay.addWidget(self.qrBtn)
+        lay.addWidget(self.preCheckBtn)
         lay.addStretch(1)

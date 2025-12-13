@@ -130,7 +130,7 @@ class HorizonCanvas(QWidget):
 
         # ufuk çizgisi
         p.setPen(QPen(Qt.white, 2))
-        p.drawLine(-half_w, horizon_y, half_w, horizon_y)
+        p.drawLine(int(-half_w), int(horizon_y), int(half_w), int(horizon_y))
 
         # metin için transform'u sıfırla (dönmesin)
         p.resetTransform()

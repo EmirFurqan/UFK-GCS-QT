@@ -19,8 +19,8 @@ from widgets.hud_widget import HorizonHUD
 
 dotenv.load_dotenv()
 
-IMAGE_PATH = os.getenv("IMAGE_PATH", "styles/ufkefsun.png")
-QR_ICON_PATH = os.getenv("QR_ICON_PATH", "styles/qr.png")
+IMAGE_PATH = os.getenv("IMAGE_PATH")
+QR_ICON_PATH = os.getenv("QR_ICON_PATH")
 
 def make_card(title: str, prop_name: str = None):
     box = QFrame(); box.setObjectName("card")
@@ -82,6 +82,13 @@ class MainWindow(QMainWindow):
 
         # ===== Kontrol paneli (butonlar) =====
         self.controls = ControlsPanel(parent=center)
+
+        try:
+            self.map.set_vehicle_icon(
+                IMAGE_PATH
+            )
+        except Exception:
+            pass
 
         # ===== ALT BÖLGE: MAP | (CAMERA+HUD) | EMPTY =====
         bottom = QWidget(center)

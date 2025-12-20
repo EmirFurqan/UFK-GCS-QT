@@ -146,28 +146,42 @@ class MapWidget(QFrame):
         self.set_center(self._last_lat, self._last_lon, zoom if isinstance(zoom, int) else None)
 
     def add_marker(self, marker_id: str, lat: float, lon: float,
-                   icon_path: str = None, popup: str = None, icon_size=(36, 36)):
+                   icon_path: str = None, popup: str = None, icon_size=(36, 36), opacity: float = None, heading: float = None):
         """Genel amaçlı marker ekleme/güncelleme."""
         lat_js = "null" if lat is None else str(lat)
         lon_js = "null" if lon is None else str(lon)
 
         icon_url = self._local_file_to_data_url(icon_path) if icon_path else None
         icon_part = f"'{icon_url}'" if icon_url else "null"
+        
+        opacity_js = str(float(opacity)) if opacity is not None else "null"
+        heading_js = str(float(heading)) if heading is not None else "null"
 
         # JS string güvenli popup
         if popup is None:
             popup_js = "null"
         else:
-            safe = popup.replace("\\", "\\\\").replace("'", "\\'")
+            safe = popup.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "<br>")
             popup_js = f"'{safe}'"
 
         js = (
             "window.addOrUpdateMarker("
             + f"'{marker_id}', " + lat_js + ", " + lon_js + ", "
             + "{ iconUrl: " + icon_part
-            + f", iconSize: [{icon_size[0]},{icon_size[1]}], popup: " + popup_js + " });"
+            + f", iconSize: [{icon_size[0]},{icon_size[1]}], popup: " + popup_js 
+            + ", opacity: " + opacity_js + ", heading: " + heading_js + " });"
         )
         self._view.page().runJavaScript(js)
+        
+        # Heading varsa çizgi de çiz (Mavlink aracı gibi)
+        if heading is not None and lat is not None and lon is not None:
+             # Marker ID'si "team_1" ise Line ID'si "team_1_heading" olsun
+             line_id = f"{marker_id}_heading"
+             js_line = (
+                f"window.drawHeadingLine('{line_id}', "
+                + str(lat) + ", " + str(lon) + ", " + str(heading) + ", 600);"
+            )
+             self._view.page().runJavaScript(js_line)
 
     def fit_to_markers(self):
         self._view.page().runJavaScript("window.fitToMarkers();")

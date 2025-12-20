@@ -16,6 +16,14 @@ class Telemetry:
     iha_batarya0: Optional[float] = None
     iha_batarya1: Optional[float] = None
     gps_saati: Optional[int] = None
+    
+    # Hedef / Yarışma verileri
+    hedef_merkez_X: int = 0
+    hedef_merkez_Y: int = 0
+    hedef_genislik: int = 0
+    hedef_yukseklik: int = 0
+    iha_otonom: int = 0
+    iha_kilitlenme: int = 0
 
 class TelemetryHandler:
     def handle_message(self, msg, state: Telemetry) -> bool:

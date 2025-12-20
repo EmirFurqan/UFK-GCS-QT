@@ -42,4 +42,10 @@ class ControlsPanel(QWidget):
         lay.addWidget(self.missionBtn)
         lay.addWidget(self.qrBtn)
         lay.addWidget(self.preCheckBtn)
+
+        # SUNUCU Gönderim
+        self.serverBtn = QPushButton("Sunucu")
+        self.serverBtn.setObjectName("serverBtn")
+        self.serverBtn.setFixedHeight(32)
+        lay.addWidget(self.serverBtn)
         lay.addStretch(1)

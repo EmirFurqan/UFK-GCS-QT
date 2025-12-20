@@ -136,6 +136,7 @@
       }
       if (options.popup) m.bindPopup(options.popup);
       if (typeof options.heading === 'number') setMarkerRotation(m, options.heading);
+      if (typeof options.opacity === 'number') m.setOpacity(options.opacity);
     }
 
     // merkez/zoom ayarla (animasyonlu fly)

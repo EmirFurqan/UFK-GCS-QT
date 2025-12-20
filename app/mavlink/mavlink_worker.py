@@ -3,8 +3,8 @@ import queue
 from PyQt5.QtCore import QThread, pyqtSignal
 from pymavlink import mavutil
 
-from app.mavlink.telemetry_handler import Telemetry, TelemetryHandler
-from app.mavlink.command_handler import CommandHandler
+from mavlink.telemetry_handler import Telemetry, TelemetryHandler
+from mavlink.command_handler import CommandHandler
 
 SERIAL_DEVICE = "/dev/tty.usbmodem1101"
 BAUD = 57600
@@ -21,7 +21,9 @@ class MavlinkWorker(QThread):
         self._cmd_queue = queue.Queue() 
         self.master = None
         self.cmd_handler = None
+        self.cmd_handler = None
         self.telem_handler = TelemetryHandler()
+        self.telemetry_state = Telemetry()
 
     def stop(self):
         self._stop = True
@@ -54,14 +56,14 @@ class MavlinkWorker(QThread):
         self.master.wait_heartbeat()
         self.status.emit("MAVLink Heartbeat alındı!")
 
-        state = Telemetry(heartbeat=True)
+        self.telemetry_state.heartbeat = True
         
         while not self._stop:
             # 1. Gelen mesajları oku
             msg = self.master.recv_match(blocking=False)
             if msg:
-                if self.telem_handler.handle_message(msg, state):
-                    self.telemetry.emit(state)
+                if self.telem_handler.handle_message(msg, self.telemetry_state):
+                    self.telemetry.emit(self.telemetry_state)
             
             # 2. Komut kuyruğunu işle
             try:

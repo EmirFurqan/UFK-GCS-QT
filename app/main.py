@@ -11,7 +11,7 @@ from widgets.controls_panel import ControlsPanel
 from widgets.region_dialog import RegionDialog
 from pathlib import Path
 import json
-from mavlink.mavsdk_worker import MavsdkWorker 
+from mavlink.mavlink_worker import MavlinkWorker 
 import dotenv
 from widgets.camera import VideoWidget 
 from widgets.hud_widget import HorizonHUD

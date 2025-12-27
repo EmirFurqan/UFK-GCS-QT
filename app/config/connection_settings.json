@@ -1,0 +1,11 @@
+{
+    "plane_connection_type": "udp",
+    "plane_address": "0.0.0.0",
+    "plane_port": "14554",
+    "plane_serial_port": "/dev/ttyUSB0",
+    "plane_baud": "57600",
+    "camera_port": "5000",
+    "server_address": "http://10.1.36.10:8000/",
+    "server_username": "takim1",
+    "server_password": "gizlisifre1"
+}

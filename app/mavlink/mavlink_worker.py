@@ -15,7 +15,7 @@ class MavlinkWorker(QThread):
     status    = pyqtSignal(str)
     error     = pyqtSignal(str)
 
-    def __init__(self):
+    def __init__(self, connection_string=None):
         super().__init__()
         self._stop = False
         self._cmd_queue = queue.Queue() 
@@ -24,6 +24,7 @@ class MavlinkWorker(QThread):
         self.cmd_handler = None
         self.telem_handler = TelemetryHandler()
         self.telemetry_state = Telemetry()
+        self.connection_string = connection_string
 
     def stop(self):
         self._stop = True
@@ -38,7 +39,7 @@ class MavlinkWorker(QThread):
         self._cmd_queue.put(("motor_test", motor_id))
 
     def run(self):
-        connection_str = CONNECTION_STRING if CONNECTION_STRING else f"{SERIAL_DEVICE}:{BAUD}"
+        connection_str = self.connection_string if self.connection_string else (CONNECTION_STRING if CONNECTION_STRING else f"{SERIAL_DEVICE}:{BAUD}")
         self.status.emit(f"Bağlanıyor: {connection_str}")
         
         try:

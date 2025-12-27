@@ -43,14 +43,14 @@ class SenderThread(QThread):
 class TelemetrySenderDialog(QDialog):
     competitors_update = pyqtSignal(list)
     
-    def __init__(self, parent=None, telemetry_state=None):
+    def __init__(self, parent=None, telemetry_state=None, default_url=None):
         super().__init__(parent)
         self.setWindowTitle("Sunucuya Telemetri Gönder")
         self.resize(400, 500)
         self.telemetry_state = telemetry_state
         
         # Varsayılan URL
-        self.default_url = "http://10.1.36.78:8000/api/telemetri_gonder"
+        self.default_url = default_url if default_url else "http://10.1.36.78:8000/api/telemetri_gonder"
         
         self.is_running = False
         

@@ -1,8 +1,10 @@
 import sys, qtawesome as qta, signal, traceback, os
 from PyQt5.QtWidgets import (
     QApplication, QMainWindow, QWidget, QLabel, QLineEdit, QPushButton,
-    QVBoxLayout, QHBoxLayout, QGridLayout, QFrame, QSizePolicy,QMessageBox, QInputDialog, QListWidget, QListWidgetItem
+    QVBoxLayout, QHBoxLayout, QGridLayout, QFrame, QSizePolicy,QMessageBox, QInputDialog, QListWidget, QListWidgetItem,
+    QDialog
 )
+from widgets.status_widget import ConnectionStatusWidget
 from PyQt5.QtCore import Qt, QSize, QCoreApplication
 from widgets import MetricRow
 from widgets.Map.map import MapWidget
@@ -16,7 +18,10 @@ import dotenv
 from widgets.camera import VideoWidget 
 from widgets.hud_widget import HorizonHUD
 from widgets.precheck_modal import PreCheckDialog
-from widgets.telemetry_sender import TelemetrySenderDialog
+from workers.server_worker import ServerWorker
+# from widgets.telemetry_sender import TelemetrySenderDialog # Removing as it's replaced
+from config.settings_manager import SettingsManager
+from widgets.connection_modal import ConnectionDialog
 
 
 dotenv.load_dotenv()
@@ -60,14 +65,21 @@ class MainWindow(QMainWindow):
         hl.setContentsMargins(12, 10, 12, 10)
         hl.setSpacing(10)
 
-        title = QLabel("Telemetry")
-        title.setObjectName("title")
-        self.statusLbl = QLabel("Bağlantı bekleniyor…")
-        self.statusLbl.setObjectName("statusLbl")
-
-        hl.addWidget(title)
+        # Status Widget
+        self.status_widget = ConnectionStatusWidget()
+        
+        # Bağlantı Butonu (Header için)
+        self.connBtn = QPushButton("Bağlantı")
+        self.connBtn.setObjectName("connBtnHeader") # Farklı stil gerekebilirse diye
+        # Buton stili (isteğe bağlı, şimdilik varsayılan)
+        
+        # Layout: [StatusWidget] ...... [ConnectionButton]
+        hl.addWidget(self.status_widget)
         hl.addStretch(1)
-        hl.addWidget(self.statusLbl)
+        hl.addWidget(self.connBtn)
+
+        # ===== Settings =====
+        self.settings = SettingsManager.load_settings()
 
         # ===== Telemetry panel (üstteki kartlar) =====
         self.panel = TelemetryPanel(parent=center)
@@ -76,7 +88,8 @@ class MainWindow(QMainWindow):
         self.map = MapWidget(parent=center)
 
         # ===== Video (kamera) =====
-        self.video = VideoWidget(parent=center, port=5000)
+        cam_port = int(self.settings.get("camera_port", 5000))
+        self.video = VideoWidget(parent=center, port=cam_port)
 
         # ===== HUD (orta sütunun altı) =====
         self.hud = HorizonHUD(parent=center)
@@ -147,7 +160,10 @@ class MainWindow(QMainWindow):
         # Ön kontrol
         self.controls.preCheckBtn.clicked.connect(self.on_precheck_clicked)
         # Sunucu butonu
-        self.controls.serverBtn.clicked.connect(self.on_server_clicked)
+        # Sunucu butonu
+        # self.controls.serverBtn.clicked.connect(self.on_server_clicked) # Removed
+        # Bağlantı butonu (Header'da artık)
+        self.connBtn.clicked.connect(self.on_connection_clicked)
 
         # Açılışta kayıtlı bölgeyi yükle ve çiz (harita hazır olduğunda)
         self._regions_path = Path(__file__).resolve().parent / "config" / "regions" / "regions.json"
@@ -159,18 +175,83 @@ class MainWindow(QMainWindow):
         self.map.on_ready(lambda: self._load_and_draw_region())
 
         # Worker
-        self.w = MavlinkWorker()
-        self.w.status.connect(self.statusLbl.setText)
-        self.w.error.connect(self.statusLbl.setText)
+        conn_str = self._build_mavlink_connection_string()
+        self.w = MavlinkWorker(connection_string=conn_str)
+        # self.w.status.connect(self.statusLbl.setText) # Legacy removed
+        # self.w.error.connect(self.statusLbl.setText)   # Legacy removed
         self.w.telemetry.connect(self.on_telemetry)
-        self.w.start()
-        print("Worker started")
+        # self.w.start() # Manual Start
+        
         # Kamera
-        self.video.start()
+        # self.video.start() # Manual Start
             
     def on_telemetry(self, t):
         if not self.isVisible():
             return
+            
+        # Server Worker'a veri bas
+        if hasattr(self, "srv_worker") and self.srv_worker.isRunning():
+            # Telemetri objesini dict/json formatına çevirmek lazım.
+            # Telemetry objesi likely bir struct/namespace. 
+            # API formatına uygun dict oluştur.
+            # Şimdilik varsayım: t.__dict__ veya manuel mapping.
+            # Yarışma isterlerine göre:
+            # Telemetry objesinden veya sistem saatinden GPS saati oluştur
+            from datetime import datetime
+            now = datetime.now()
+            gps_time = {
+                "saat": now.hour,
+                "dakika": now.minute,
+                "saniye": now.second,
+                "milisaniye": int(now.microsecond / 1000)
+            }
+            
+            # Takım Numarası: Username'den çıkar veya settings'den, yoksa 1
+            t_num = 1
+            try:
+                # Kullanıcı adı "takim1" gibiyse
+                srv_user = self.settings.get("server_username", "")
+                import re
+                match = re.search(r'\d+', srv_user)
+                if match:
+                    t_num = int(match.group())
+            except:
+                pass
+
+            # Yardımcı fonksiyonlar: None gelirse 0'a çevir
+            def sf(val): 
+                try:
+                    return float(val) if val is not None else 0.0
+                except:
+                    return 0.0
+            
+            def si(val):
+                try:
+                    return int(val) if val is not None else 0
+                except:
+                    return 0
+
+            data = {
+                "takim_numarasi": t_num, 
+                "iha_enlem": sf(getattr(t, "iha_enlem", 0)),
+                "iha_boylam": sf(getattr(t, "iha_boylam", 0)),
+                "iha_irtifa": sf(getattr(t, "iha_irtifa", 0)),
+                "iha_dikilme": sf(getattr(t, "iha_dikilme", 0)),
+                "iha_yonelme": sf(getattr(t, "iha_yonelme", 0)),
+                "iha_yatis": sf(getattr(t, "iha_yatis", 0)),
+                "iha_hiz": sf(getattr(t, "iha_hiz", 0)),
+                "iha_batarya": sf(getattr(t, "iha_batarya0", 0)), 
+                "iha_otonom": si(getattr(t, "iha_otonom", 0)),
+                "iha_kilitlenme": si(getattr(t, "iha_kilitlenme", 0)),
+                "hedef_merkez_X": si(getattr(t, "hedef_merkez_X", 0)),
+                "hedef_merkez_Y": si(getattr(t, "hedef_merkez_Y", 0)),
+                "hedef_genislik": si(getattr(t, "hedef_genislik", 0)),
+                "hedef_yukseklik": si(getattr(t, "hedef_yukseklik", 0)),
+                "gps_saati": gps_time
+            }
+            # Takım numarasını statik 1 veya settings'den alalım.
+            # Geçici olarak 1.
+            self.srv_worker.update_telemetry_data(data)
 
         # Üstteki kartları güncelle
         self.panel.update_telemetry(t)
@@ -254,13 +335,19 @@ class MainWindow(QMainWindow):
             # ama en güzeli worker'a referans vermek.
             pass
 
+        server_url = self.settings.get("server_address", "http://10.1.36.78:8000/api/telemetri_gonder")
+
         # Dialog'u aç
         # Not: Dialog'u self.server_dlg gibi saklayıp tekrar açmak daha iyi olabilir (state korumak için)
         if not hasattr(self, "server_dlg") or self.server_dlg is None:
-            self.server_dlg = TelemetrySenderDialog(self, telemetry_state=state)
+            self.server_dlg = TelemetrySenderDialog(self, telemetry_state=state, default_url=server_url)
         
         # State referansını güncelle (eğer değiştiyse veya ilk null ise)
         self.server_dlg.telemetry_state = state
+        
+        # URL güncellenmiş olabilir
+        if server_url:
+            self.server_dlg.url_input.setText(server_url)
         
         # Sinyal bağlantısını her seferinde yapmamak için kontrol veya disconnect gerekebilir
         # Ancak PyQt aynı slotu çoklu bağlamayı (bazen) önler veya biz try-except ile yönetebiliriz.
@@ -273,6 +360,187 @@ class MainWindow(QMainWindow):
         self.server_dlg.show()
         self.server_dlg.raise_()
         self.server_dlg.activateWindow()
+
+    def _build_mavlink_connection_string(self):
+        ctype = self.settings.get("plane_connection_type", "udp")
+        if ctype == "serial":
+            port = self.settings.get("plane_serial_port", "/dev/ttyUSB0")
+            baud = self.settings.get("plane_baud", "57600")
+            return f"{port}:{baud}"
+        else:
+            # UDP (default)
+            addr = self.settings.get("plane_address", "0.0.0.0")
+            port = self.settings.get("plane_port", "14550")
+            return f"udpin:{addr}:{port}"
+
+    def on_connection_clicked(self):
+        # Eğer zaten bağlıysak (buton "Bağlantıyı Kes" ise) direkt keselim
+        if self.connBtn.text() == "Bağlantıyı Kes":
+            reply = QMessageBox.question(self, "Bağlantı", "Bağlantıyı kesmek istiyor musunuz?", QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                self._perform_disconnect()
+            return
+
+        # State: 0=SaveOnly, 1=Connect, 2=Disconnect
+        dlg = ConnectionDialog(self)
+        res = dlg.exec_()
+        
+        # Reload settings always if saved
+        self.settings = SettingsManager.load_settings()
+
+        if res == 1: # CONNECT
+            self._perform_connect()
+            
+        elif res == 2: # DISCONNECT
+            self._perform_disconnect()
+
+    def _perform_connect(self):
+        # 1. Update Indicators
+        self.status_widget.set_plane_status(True, "Bağlanıyor...")
+        self.status_widget.set_camera_status(True)
+        self.status_widget.set_server_status(True, "Giriş yapılıyor...")
+        
+        # Buton güncelle
+        self.connBtn.setText("Bağlantıyı Kes")
+        self.connBtn.setStyleSheet("background-color: #c62828; color: white;") # Opsiyonel: Kırmızı yap
+
+        # 2. Mavlink Worker
+        if hasattr(self, "w"):
+            if self.w.isRunning():
+                self.w.stop(); self.w.wait(500)
+        
+        conn_str = self._build_mavlink_connection_string()
+        self.w = MavlinkWorker(connection_string=conn_str)
+        # self.w.status.connect(self.statusLbl.setText) # Legacy
+        self.w.error.connect(lambda e: self.status_widget.set_plane_status(False)) # On Error
+        self.w.telemetry.connect(self.on_telemetry)
+        
+        # Bağlantı başarılı olduğunda (Heartbeat) yeşil yapmak için sinyal lazım.
+        # Şimdilik "Bağlanıyor" sarı kalsın, heartbeat gelince on_telemetry'de yeşil yaparız.
+        self.w.status.connect(lambda s: self.status_widget.set_plane_text(s, "yellow"))
+        self.w.start()
+        
+        # 3. Camera
+        cam_port = int(self.settings.get("camera_port", 5000))
+        if hasattr(self, "video"):
+            self.video.stop()
+            self.video.set_port(cam_port)
+            self.video.start()
+        
+        # 4. Server Worker
+        srv_addr = self.settings.get("server_address", "http://10.1.36.78:8000")
+        srv_user = self.settings.get("server_username", "")
+        srv_pass = self.settings.get("server_password", "")
+        
+        if hasattr(self, "srv_worker"):
+            self.srv_worker.stop()
+        
+        self.srv_worker = ServerWorker(srv_addr, srv_user, srv_pass)
+        self.srv_worker.login_result.connect(self.on_server_login)
+        self.srv_worker.data_fetched.connect(self.on_server_data)
+        self.srv_worker.telemetry_result.connect(self.on_server_telemetry_result)
+        self.srv_worker.error.connect(lambda e: self.status_widget.set_server_status(False))
+        self.srv_worker.start()
+
+    def _perform_disconnect(self):
+        try:
+            self.status_widget.set_plane_status(False)
+            self.status_widget.set_camera_status(False)
+            self.status_widget.set_server_status(False)
+            
+            # 1. Mavlink
+            if hasattr(self, "w") and self.w:
+                try:
+                    self.w.stop()
+                    self.w.wait(500) # Give 500ms to exit
+                except Exception as e:
+                    print("Mavlink stop error:", e)
+            
+            # 2. Camera
+            if hasattr(self, "video") and self.video:
+                try:
+                    self.video.stop()
+                except Exception as e:
+                    print("Video stop error:", e)
+            
+            # 3. Server
+            if hasattr(self, "srv_worker") and self.srv_worker:
+                try:
+                    self.srv_worker.stop()
+                    # Server worker might be blocking in `sleep` or `request`.
+                    # wait() is good but maybe timeout is needed?
+                    self.srv_worker.wait(1000)
+                except Exception as e:
+                    print("Server stop error:", e)
+
+        except Exception as e:
+            print("Disconnect general error:", e)
+        
+        finally:
+            # Buton güncelle her durumda
+            self.connBtn.setText("Bağlantı")
+            self.connBtn.setStyleSheet("") # Varsayılana dön
+    def on_server_login(self, success, msg):
+        if success:
+            self.status_widget.set_server_status(True, "Bağlı")
+        else:
+            self.status_widget.set_server_status(False, f"Giriş Hata: {msg}")
+            
+    def on_server_data(self, dtype, data):
+        if dtype == "qr":
+            # QR koordinatı handle
+            print("QR Coords:", data)
+            # Haritaya ekle (basitçe)
+            # data: {'enlem': x, 'boylam': y} vs. veya API dokümanına göre
+            # API: GET /api/qr_koordinati -> { "qr_enlem": "...", "qr_boylam": "..." }
+            try:
+                lat = float(data.get("qr_enlem", 0))
+                lon = float(data.get("qr_boylam", 0))
+                if lat != 0 and lon != 0:
+                    self._set_qr_point(lat, lon)
+            except:
+                pass
+                
+        elif dtype == "hss":
+            # HSS handle
+            print("HSS Coords:", data)
+            # data: list of dicts [{'hss_enlem':.., 'hss_boylam':.., 'hss_yaricap':..}]
+            try:
+                if isinstance(data, list):
+                    for hss in data:
+                        lat = float(hss.get("hss_enlem", 0))
+                        lon = float(hss.get("hss_boylam", 0))
+                        rad = float(hss.get("hss_yaricap", 0))
+                        # Haritaya circle ekleme metodu yoksa simple marker veya draw_bounds kullanabiliriz.
+                        # MapWidget'a bakmam lazım. Şimdilik add_marker ile geçelim veya pas geçelim.
+                        # MapWidget'da add_circle yoksa implemente etmek lazım ama şimdilik print yeterli.
+                        pass
+            except:
+                pass
+
+    def on_server_telemetry_result(self, success, result):
+        if success:
+            self.status_widget.set_server_text("Gökçen (OK)", "green")
+            
+            # Rakip verisi (result)
+            # Beklenen format: { "konumBilgileri": [ ... ], "sunucusaati": { ... } }
+            competitors_list = []
+            
+            if isinstance(result, dict):
+                # Yeni format
+                competitors_list = result.get("konumBilgileri", [])
+                
+                # İstersen sunucu saatini de loglayabilirsin
+                # server_time = result.get("sunucusaati")
+                
+            elif isinstance(result, list):
+                # Eski format veya doğrudan liste gelirse
+                competitors_list = result
+                
+            if competitors_list:
+                self.update_competitors(competitors_list)
+        else:
+            self.status_widget.set_server_text("Hata", "red")
 
     def update_competitors(self, competitors):
         """
@@ -325,7 +593,13 @@ class MainWindow(QMainWindow):
             filtered_hdg = self._competitor_filters[t_no]['hdg']
 
             # Label oluştur
-            txt = f"Takım {t_no} (Alt: {alt}m)"
+            # Label oluştur
+            spd = comp.get("iha_hizi", 0)
+            hdg = comp.get("iha_yonelme", 0)
+            # Koordinatları da ekle
+            lat_str = f"{filtered_lat:.5f}"
+            lon_str = f"{filtered_lon:.5f}"
+            txt = f"Takım {t_no}\nK: {lat_str}, {lon_str}\nAlt: {alt}m | Hız: {spd}m/s | Yön: {hdg}°"
             
             item = QListWidgetItem(txt)
             # Item data olarak ID sakla
@@ -468,7 +742,7 @@ class MainWindow(QMainWindow):
         if not hasattr(self, "w") or self.w is None:
             return
 
-        self.statusLbl.setText("Mission: ARM + TAKEOFF + START...")
+        # self.statusLbl.setText("Mission: ARM + TAKEOFF + START...")
         try:
             self.w.start_mission() 
         except Exception as e:

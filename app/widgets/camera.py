@@ -15,6 +15,7 @@ class VideoWidget(QWidget):
         self._cap = None
         self._is_connecting = False
 
+
         self.connection_result.connect(self._on_connection_result)
 
         # Ana layout
@@ -55,6 +56,9 @@ class VideoWidget(QWidget):
         self._timer.setInterval(33)
         self._timer.timeout.connect(self._update_frame)
 
+    def set_port(self, port):
+        self._port = port
+
     def _open_capture_threaded(self):
         # GStreamer: appsink'e bloklamayı azaltan ayarlar ekledik
         gst_pipeline = (
@@ -78,6 +82,8 @@ class VideoWidget(QWidget):
         if self._is_connecting:
             return
 
+        self._stopped_manually = False # Flag reset
+
         # UI hazırlık
         self._error_widget.hide()
         self._label.show()
@@ -97,6 +103,12 @@ class VideoWidget(QWidget):
         self._is_connecting = False
         self._retry_btn.setEnabled(True)
 
+        # Eğer manuel olarak durdurulduysa, gelen bağlantıyı kabul etme
+        if getattr(self, "_stopped_manually", False):
+            if success and cap:
+                cap.release()
+            return
+
         if success:
             self._cap = cap
             self._label.setText("") # Texti temizle
@@ -108,6 +120,9 @@ class VideoWidget(QWidget):
             self._alert_lbl.setText("Kamera bağlantısı başarısız")
 
     def stop(self):
+        self._stopped_manually = True # Flag set
+        self._is_connecting = False   # Reset connecting state immediately
+        
         self._timer.stop()
         if self._cap is not None:
              # Release işlemi de bloklayabilir, thread'e almak iyi olur ama
@@ -139,6 +154,10 @@ class VideoWidget(QWidget):
         self._label.setPixmap(pix)
 
     def resizeEvent(self, e):
+        if not hasattr(self, "_label") or self._label is None:
+            super().resizeEvent(e)
+            return
+        
         pm = self._label.pixmap()
         if pm is not None:
             self._label.setPixmap(pm.scaled(

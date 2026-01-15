@@ -738,8 +738,22 @@ class MainWindow(QMainWindow):
         """
         Mission butonu:
         - Worker'a 'arm + takeoff + misyonu başlat' komutu gönderir
+        - Önce şifre sorar (6161)
         """
         if not hasattr(self, "w") or self.w is None:
+            return
+
+        # Şifre sor
+        password, ok = QInputDialog.getText(
+            self, "Görev Başlatma Koruması", "Lütfen görev başlatma şifresini giriniz:", 
+            QLineEdit.Password
+        )
+        
+        if not ok:
+            return
+            
+        if password != "6161":
+            QMessageBox.warning(self, "Hata", "Hatalı şifre! Görev başlatılamadı.")
             return
 
         # self.statusLbl.setText("Mission: ARM + TAKEOFF + START...")

@@ -32,13 +32,11 @@ class HorizonHUD(QWidget):
         def make_label(title, color):
             # Başlık
             title_lbl = QLabel(title)
-            title_lbl.setStyleSheet("color: #000000; font-size: 13px;")
-
+            title_lbl.setObjectName("hudTitle")
+            
             # Değer label'ı (ÖNCE oluşturuyoruz)
             value_lbl = QLabel("0.0")
-            value_lbl.setStyleSheet(
-                "color: #000000; font-size: 15px; font-weight: bold;"
-            )
+            value_lbl.setObjectName("hudValue")
 
             box = QVBoxLayout()
             box.setSpacing(0)
@@ -132,16 +130,5 @@ class HorizonCanvas(QWidget):
         p.setPen(QPen(Qt.white, 2))
         p.drawLine(int(-half_w), int(horizon_y), int(half_w), int(horizon_y))
 
-        # metin için transform'u sıfırla (dönmesin)
+        # Text drawing removed as requested
         p.resetTransform()
-        p.setPen(QPen(Qt.white))
-        font = QFont()
-        font.setPointSize(10)
-        p.setFont(font)
-
-        text = f"Roll {self.roll:.1f}°    Pitch {self.pitch:.1f}°"
-        p.drawText(
-            self.rect().adjusted(8, 0, -8, -4),
-            Qt.AlignBottom | Qt.AlignLeft,
-            text,
-        )

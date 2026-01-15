@@ -1,8 +1,194 @@
-/* === Metric rows (ikonlu satırlar) === */
-#panel {
-  background: #121722;
-  border: 1px solid #1f2432;
-  border-radius: 14px;
+/* === GLOBAL RESET & BASE COLORS === */
+QWidget {
+    background-color: #121212;
+    color: #e0e0e0;
+    font-size: 14px;
+    font-family: "Segoe UI", "Roboto", sans-serif;
+}
+
+/* === BUTTONS === */
+QPushButton {
+    background-color: #212121;
+    border: 1px solid #333333;
+    border-radius: 6px;
+    color: #ffffff;
+    padding: 6px 12px;
+    font-weight: 500;
+}
+
+QPushButton:hover {
+    background-color: #333333;
+    border-color: #444444;
+}
+
+QPushButton:pressed {
+    background-color: #1a1a1a;
+    border-color: #555555;
+}
+
+QPushButton:disabled {
+    background-color: #1e1e1e;
+    color: #666666;
+    border-color: #2a2a2a;
+}
+
+/* === INPUTS === */
+QLineEdit, QSpinBox, QDoubleSpinBox {
+    background-color: #1e1e1e;
+    border: 1px solid #333333;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #ffffff;
+    selection-background-color: #2196F3;
+}
+
+QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus {
+    border-color: #2196F3;
+}
+
+/* === LISTS === */
+QListWidget {
+    background-color: #1e1e1e;
+    border: 1px solid #333333;
+    border-radius: 6px;
+    outline: none;
+}
+
+QListWidget::item {
+    padding: 8px;
+    border-bottom: 1px solid #2a2a2a;
+}
+
+QListWidget::item:selected {
+    background-color: #263238;
+    color: #ffffff;
+    border-left: 3px solid #2196F3;
+}
+
+QListWidget::item:hover {
+    background-color: #252525;
+}
+
+/* === SCROLLBARS === */
+QScrollBar:vertical {
+    border: none;
+    background: #121212;
+    width: 10px;
+    margin: 0px;
+}
+QScrollBar::handle:vertical {
+    background: #424242;
+    min-height: 20px;
+    border-radius: 5px;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+/* === METRIC ROWS & CARDS === */
+#panel, #card {
+  background: #1E1E1E;
+  border: 1px solid #333333;
+  border-radius: 12px;
+}
+
+#metric {
+  background: #252525;
+  border: 1px solid #333333;
+  border-radius: 8px;
+}
+
+#metric:hover { background: #2a2a2a; }
+
+#metricIcon {
+  min-width: 28px; min-height: 28px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: #333333;
+  color: #2196F3;
+}
+
+#metricTitle, #cardTitle {
+  color: #B0BEC5;
+  font-size: 12px;
+
+  text-transform: uppercase;
+}
+
+#metricValue, #cardValue {
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+#metricUnit {
+  color: #757575;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+/* === CONTROLS PANEL === */
+#controlsPanel {
+  background: #1E1E1E;
+  border: 1px solid #333333;
+  border-radius: 12px;
+}
+
+#controlsPanel QPushButton {
+    background-color: #263238;
+    border: 1px solid #37474F;
+    min-height: 32px;
+}
+#controlsPanel QPushButton:hover {
+    background-color: #37474F;
+}
+#controlsPanel QPushButton:pressed {
+    background-color: #1e1e1e;
+}
+
+/* === HEADER === */
+QFrame#header {
+    background-color: #1E1E1E;
+    border-bottom: 1px solid #333333;
+}
+
+QPushButton#connBtnHeader {
+    background-color: #2E7D32; /* Green default */
+    border: none;
+    font-weight: bold;
+}
+QPushButton#connBtnHeader:hover {
+    background-color: #388E3C;
+}
+
+/* === DIALOGS === */
+QDialog {
+    background-color: #121212;
+}
+
+QLabel#stepTitle {
+    font-size: 18px;
+    font-weight: bold;
+    color: #2196F3; 
+    margin-bottom: 8px;
+}
+
+QLabel#infoLabel {
+    color: #9E9E9E;
+    font-style: italic;
+}
+
+/* === HUD WIDGET === */
+#hudTitle {
+    color: #B0BEC5;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+#hudValue {
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: bold;
 }
 
 #metric {
@@ -24,7 +210,7 @@
 #metricTitle {
   color: #9aa6b2;
   font-size: 12px;
-  letter-spacing: .3px;
+
 }
 
 #metricValue {

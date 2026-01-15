@@ -10,41 +10,8 @@ class PreCheckDialog(QDialog):
         self.resize(600, 400)
         self.worker = worker
         
-        # Styles for this dialog specifically
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #1e1e1e;
-                color: #ffffff;
-            }
-            QLabel {
-                font-size: 14px;
-                color: #eeeeee;
-            }
-            QPushButton {
-                background-color: #3a3a3a;
-                border: 1px solid #555;
-                border-radius: 4px;
-                padding: 8px;
-                color: white;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #4a4a4a;
-            }
-            QPushButton:pressed {
-                background-color: #2a2a2a;
-            }
-            #stepTitle {
-                font-size: 18px;
-                font-weight: bold;
-                color: #4CAF50;
-                margin-bottom: 10px;
-            }
-            #infoLabel {
-                font-style: italic;
-                color: #aaaaaa;
-            }
-        """)
+        # Styles are handled in styles.qss
+
 
         layout = QVBoxLayout(self)
 
@@ -132,6 +99,16 @@ class PreCheckDialog(QDialog):
         p2_layout.addStretch(1)
         self.pages.addWidget(page2)
 
+        self.lblStatus = QLabel("")
+        self.lblStatus.setAlignment(Qt.AlignCenter)
+        self.lblStatus.setStyleSheet("color: #FFD700; font-weight: bold;")
+        p2_layout.addWidget(self.lblStatus)
+
+        self.btnAutoTest = QPushButton("Otomatik Test Başlat")
+        self.btnAutoTest.clicked.connect(self.start_auto_test)
+        self.btnAutoTest.setStyleSheet("background-color: #2196F3;")
+        p2_layout.addWidget(self.btnAutoTest)
+
         # Footer Buttons
         btn_layout = QHBoxLayout()
         self.btnCancel = QPushButton("Kapat")
@@ -145,6 +122,49 @@ class PreCheckDialog(QDialog):
         layout.addLayout(btn_layout)
 
         self.current_step = 0
+        self.test_queue = []
+
+    def start_auto_test(self):
+        """
+        Sırayla tüm yüzeyleri test et:
+        1. Sağ Aileron (3sn) -> Dur (1sn)
+        2. Sol Aileron (3sn) -> Dur (1sn)
+        ...
+        """
+        self.test_queue = [
+            ("Sağ Aileron", 0, 0.5, 0, 0),
+            ("Sol Aileron", 0, -0.5, 0, 0),
+            ("Yukarı Elevator", 0.5, 0, 0, 0),
+            ("Aşağı Elevator", -0.5, 0, 0, 0),
+            ("Sağ Rudder", 0, 0, 0, 0.5),
+            ("Sol Rudder", 0, 0, 0, -0.5)
+        ]
+        self.btnAutoTest.setEnabled(False)
+        self.run_next_test()
+
+    def run_next_test(self):
+        if not self.test_queue:
+            self.lblStatus.setText("Otomatik Test Tamamlandı.")
+            self.btnAutoTest.setEnabled(True)
+            return
+
+        name, x, y, z, r = self.test_queue.pop(0)
+        self.lblStatus.setText(f"Test ediliyor: {name}...")
+        
+        # Komutu gönder
+        if self.worker:
+            self.worker.send_manual_control(x, y, z, r)
+            
+        # 3 saniye bekle, sonra durdur
+        QTimer.singleShot(3000, self.stop_current_test)
+
+    def stop_current_test(self):
+        # Nötrle
+        if self.worker:
+            self.worker.send_manual_control(0, 0, 0, 0)
+            
+        # 1 saniye bekle, sonraki teste geç
+        QTimer.singleShot(1000, self.run_next_test)
 
     def go_next(self):
         if self.current_step == 0:
@@ -169,4 +189,3 @@ class PreCheckDialog(QDialog):
         if self.worker:
             self.worker.send_manual_control(x, y, z, r)
             QTimer.singleShot(1000, lambda: self.worker.send_manual_control(0, 0, 0, 0))
-
